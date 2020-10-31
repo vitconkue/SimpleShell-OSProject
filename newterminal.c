@@ -10,11 +10,13 @@ int main()
     
 
     char* args[MAXLEN/2 + 1];
-
+    char* history[100];
+    int index=0;
     int shouldRun = 1; 
     
     while(shouldRun)
     {
+         
 
         int childStatus;
         printf("osh> "); 
@@ -24,11 +26,12 @@ int main()
         char enteredCommand[MAXLEN + 1];
         char* ptrEnteredCommand = enteredCommand; 
 
+        
 
         fflush(stdin); 
         scanf("%[^\n]s",enteredCommand);
         while(getchar() != '\n');
-
+         
         int argIndex = 0 ; 
         // parse
         while(*ptrEnteredCommand != '\0')
@@ -51,15 +54,25 @@ int main()
         
             argIndex++; 
         }
-
-        args[argIndex] = NULL ;
-
-        //
-
+        args[argIndex] = NULL ; 
+        history[index++]=args[0];     
         pid_t pid = fork(); 
         if(pid == 0)
         {
-            execvp(args[0], args); 
+            
+            if(strcmp(args[0],"!!")==0){
+                if (index > 1)
+                {
+                    printf("%s\n", history[index-2]);
+                }
+                else{
+                    printf("empty\n");
+                }
+            }
+            else{
+                execvp(args[0], args); 
+            }
+            
         }
         else if(pid == -1)
         {
@@ -67,7 +80,7 @@ int main()
         }
         else
         {
-            wait( &childStatus); 
+            wait( &childStatus);        
         }
         
         

@@ -4,8 +4,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/wait.h>
+#include<fcntl.h> 
 #define MAXLEN 80
-
+#define _GNU_SOURCE
 static char* historyCommand[100];
 static int historyIndex = 0; 
 
@@ -14,7 +15,7 @@ void resetArgumentsList(char* inputArgs[], int numberOfArgument);
 int parseToArgumentsList(char** argsList,char* inputCommand);
 void execCommandWithArgumetsList(char** argumentList, int numberOfWord);
 void execCommand(char* commmand);
-
+void redirectOutput(char **argsList,int pos);
 
 int main() 
 { 
@@ -62,7 +63,10 @@ int parseToArgumentsList(char** argsList,char* inputCommand)
  
     char* ptrCommand = inputCommand;
 
+
     int argIndex = 0;
+
+    char delimInOut = '>';
 
     while(*ptrCommand != '\0')
         {
@@ -80,15 +84,15 @@ int parseToArgumentsList(char** argsList,char* inputCommand)
                 i++; 
             }
             *(argsList[argIndex] + i)  = '\0';
-
-            //printf("%s\n", args[argIndex]);
-        
             argIndex++; 
         }
-
-    // parse
-
-    return argIndex; 
+        for (int i = 0;i<argIndex;i++){
+            if(strcmp(argsList[i],">")==0){
+                redirectOutput(argsList,i);
+                return -1;
+            }
+        }
+        return argIndex; 
 }
 
 void execCommandWithArgumetsList(char** argumentList, int numberOfWord)
@@ -148,7 +152,7 @@ void execCommand(char* commmand)
 {
     char* args[MAXLEN/2 +1]; 
     int numberOfArg = parseToArgumentsList(args,commmand); 
-
+    if(numberOfArg!=-1){
     execCommandWithArgumetsList(args, numberOfArg);
 
     if(strcmp(commmand, "!!") != 0)
@@ -157,10 +161,42 @@ void execCommand(char* commmand)
 
         strcpy(historyCommand[historyIndex++], commmand); 
     }
+   
 
- 
-
+    }
     resetArgumentsList(args, numberOfArg); 
-
-    
+}
+void redirectOutput(char** argsList,int pos){
+    FILE *fout;
+    char *command;
+    char *filename = argsList[pos+1];
+    // for(int i=0;i<pos;i++){
+    //     strcat(command,argsList[i]); Error cant find libary'?
+    // }
+    printf("%s",command);
+    fout=fopen(filename,"w");
+    int file_desc = open(filename,O_WRONLY); 
+    int saved_stdout;
+    //Save stdout for terminal
+    saved_stdout = dup(1);
+    //dup output file to write
+    dup2(file_desc, 1) ;           
+    FILE *pipe;
+    size_t len = 0;
+    ssize_t read;
+    char * line = NULL;
+    //Read output bash cmd
+    pipe = popen("ls","r");
+    if (NULL == pipe) {
+        perror("pipe");
+        exit(1);
+    } 
+    while ((read = getline(&line, &len, pipe)) != -1) { 
+        if(line)    
+        printf("%s", line);
+    }
+    pclose(pipe);
+    //Back to output terminal
+    dup2(saved_stdout, 1);
+    close(saved_stdout);
 }

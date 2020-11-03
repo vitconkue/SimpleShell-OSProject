@@ -184,32 +184,18 @@ void redirectOutput(char** argsList,int pos){
     for (int i = 0; i < pos; i++)
     {
         command = strcatOverride(command,argsList[i]);
-        if(pos>1){
-            command = strcatOverride(command, " ");
+        if(pos>1&&i<pos-1){
+           command = strcatOverride(command," ");
         }
     }
-    
     fout = fopen(filename, "w");
     int file_desc = open(filename,O_WRONLY); 
     int saved_stdout;
     //Save stdout for terminal
     saved_stdout = dup(1);
-    //dup output file to write
+    //Dup output file to write
     dup2(file_desc, 1) ;           
-    FILE *pipe;
-    size_t len = 0;
-    ssize_t read;
-    char * line = NULL;
-    //Read output bash cmd
-    pipe = popen(command,"r");
-    if (NULL == pipe) {
-        perror("pipe");
-        exit(1);
-    } 
-    while ((read = getline(&line, &len, pipe)) != -1) {     
-        printf("%s", line);
-    }
-    pclose(pipe);
+    execCommand(command);
     fclose(fout);
     //Back to output terminal
     dup2(saved_stdout, 1);
@@ -222,38 +208,36 @@ void redirectInput(char **argsList, int pos){
     for (int i = 0; i < pos; i++)
     {
         command = strcatOverride(command,argsList[i]);
+        command = strcatOverride(command," ");
     }
-    command = strcatOverride(command, " ");
-    command= strcatOverride(command,filename);
-    execCommand(command);   
+    command = strcatOverride(command, filename);
+    execCommand(command);
 }
 
 char *strcatOverride(char *a, char *b) {
-  int i = 0, j = 0;
-  int cont = 0;
-  int len1 = strlenOverride(a);
-  int len2 = strlenOverride(b);
-  int h = len1+len2 + 1;
-  char *result = (char*)malloc(h * sizeof(char));
+    int i = 0, j = 0;
+    int count = 0;
+    int lenA = strlenOverride(a);
+    int lenB = strlenOverride(b);
+    int desLen = lenA+lenB + 1;
+    char *result = (char*)malloc(desLen * sizeof(char));
 
-  for(i = 0; i < len1; i++) {
-    result[i] = a[i];
-  }
+    for(i = 0; i < lenA; i++) {
+        result[i] = a[i];
+    }
 
-  for (j = i; j < len1 +len2; j++)
-  {
-      result[j] = b[cont++];
-  }
-
-  // append null character
-  result[h - 1] = '\0';
-  return result;
+    for (j = i; j < lenA +lenB; j++)
+    {
+         result[j] = b[count++];
+    }
+    result[desLen - 1] = '\0';
+    return result;
 }
 
 int strlenOverride(char *str){
-    int i = 0;
-    while(str[i]){
-        i++;
+    int len = 0;
+    while(str[len]){
+        len++;
     }
-    return i;
+    return len;
 }

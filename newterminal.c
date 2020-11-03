@@ -171,7 +171,7 @@ void redirectOutput(char** argsList,int pos){
     char *command;
     char *filename = argsList[pos+1];
     // for(int i=0;i<pos;i++){
-    //     strcat(command,argsList[i]); Error cant find libary'?
+    //     strcat(command,argsList[i]); //Error cant find libary'?
     // }
     printf("%s",command);
     fout=fopen(filename,"w");

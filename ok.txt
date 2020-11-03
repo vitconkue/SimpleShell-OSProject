@@ -1,0 +1,4 @@
+(null)newterminal
+newterminal.c
+ok.txt
+test

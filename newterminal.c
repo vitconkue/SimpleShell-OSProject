@@ -16,8 +16,10 @@ int parseToArgumentsList(char** argsList,char* inputCommand);
 void execCommandWithArgumetsList(char** argumentList, int numberOfWord);
 void execCommand(char* commmand);
 void redirectOutput(char **argsList,int pos);
-
-int main() 
+void redirectInput(char **argsList, int pos);
+char *strcatOverride(char *a, char *b);
+int strlenOverride(char *str);
+int main()
 { 
     
 
@@ -63,7 +65,7 @@ int parseToArgumentsList(char** argsList,char* inputCommand)
  
     char* ptrCommand = inputCommand;
 
-
+    
     int argIndex = 0;
 
     char delimInOut = '>';
@@ -86,9 +88,18 @@ int parseToArgumentsList(char** argsList,char* inputCommand)
             *(argsList[argIndex] + i)  = '\0';
             argIndex++; 
         }
+       
         for (int i = 0;i<argIndex;i++){
             if(strcmp(argsList[i],">")==0){
+                historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
+                strcpy(historyCommand[historyIndex++], inputCommand);
                 redirectOutput(argsList,i);
+                return -1;
+            }
+            else if(strcmp(argsList[i],"<")==0){
+                historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
+                strcpy(historyCommand[historyIndex++], inputCommand);
+                redirectInput(argsList, i);
                 return -1;
             }
         }
@@ -148,18 +159,18 @@ void execCommandWithArgumetsList(char** argumentList, int numberOfWord)
 }
 
 
-void execCommand(char* commmand)
+void execCommand(char* command)
 {
     char* args[MAXLEN/2 +1]; 
-    int numberOfArg = parseToArgumentsList(args,commmand); 
+    int numberOfArg = parseToArgumentsList(args,command); 
     if(numberOfArg!=-1){
     execCommandWithArgumetsList(args, numberOfArg);
 
-    if(strcmp(commmand, "!!") != 0)
+    if(strcmp(command, "!!") != 0)
     {
         historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
 
-        strcpy(historyCommand[historyIndex++], commmand); 
+        strcpy(historyCommand[historyIndex++], command); 
     }
    
 
@@ -168,13 +179,17 @@ void execCommand(char* commmand)
 }
 void redirectOutput(char** argsList,int pos){
     FILE *fout;
-    char *command;
-    char *filename = argsList[pos+1];
-    // for(int i=0;i<pos;i++){
-    //     strcat(command,argsList[i]); //Error cant find libary'?
-    // }
-    printf("%s",command);
-    fout=fopen(filename,"w");
+    char *command = "\0";
+    char *filename = argsList[pos + 1];
+    for (int i = 0; i < pos; i++)
+    {
+        command = strcatOverride(command,argsList[i]);
+        if(pos>1){
+            command = strcatOverride(command, " ");
+        }
+    }
+    
+    fout = fopen(filename, "w");
     int file_desc = open(filename,O_WRONLY); 
     int saved_stdout;
     //Save stdout for terminal
@@ -186,17 +201,59 @@ void redirectOutput(char** argsList,int pos){
     ssize_t read;
     char * line = NULL;
     //Read output bash cmd
-    pipe = popen("ls","r");
+    pipe = popen(command,"r");
     if (NULL == pipe) {
         perror("pipe");
         exit(1);
     } 
-    while ((read = getline(&line, &len, pipe)) != -1) { 
-        if(line)    
+    while ((read = getline(&line, &len, pipe)) != -1) {     
         printf("%s", line);
     }
     pclose(pipe);
+    fclose(fout);
     //Back to output terminal
     dup2(saved_stdout, 1);
     close(saved_stdout);
+}
+
+void redirectInput(char **argsList, int pos){
+    char *filename = argsList[pos + 1];
+    char *command = "\0";
+    for (int i = 0; i < pos; i++)
+    {
+        command = strcatOverride(command,argsList[i]);
+    }
+    command = strcatOverride(command, " ");
+    command= strcatOverride(command,filename);
+    execCommand(command);   
+}
+
+char *strcatOverride(char *a, char *b) {
+  int i = 0, j = 0;
+  int cont = 0;
+  int len1 = strlenOverride(a);
+  int len2 = strlenOverride(b);
+  int h = len1+len2 + 1;
+  char *result = (char*)malloc(h * sizeof(char));
+
+  for(i = 0; i < len1; i++) {
+    result[i] = a[i];
+  }
+
+  for (j = i; j < len1 +len2; j++)
+  {
+      result[j] = b[cont++];
+  }
+
+  // append null character
+  result[h - 1] = '\0';
+  return result;
+}
+
+int strlenOverride(char *str){
+    int i = 0;
+    while(str[i]){
+        i++;
+    }
+    return i;
 }

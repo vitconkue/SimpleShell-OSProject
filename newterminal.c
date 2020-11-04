@@ -19,6 +19,7 @@ void redirectOutput(char **argsList,int pos);
 void redirectInput(char **argsList, int pos);
 char *strcatOverride(char *a, char *b);
 int strlenOverride(char *str);
+int pipeline(char** argList, int numberOfArg);
 int main()
 { 
     
@@ -38,8 +39,6 @@ int main()
         fflush(stdin); 
         scanf("%[^\n]s",enteredCommand);
         while(getchar() != '\n');
-
-        
         execCommand(enteredCommand); 
 
         //printf("\nTest here\n"); 
@@ -101,7 +100,7 @@ int parseToArgumentsList(char** argsList,char* inputCommand)
                 strcpy(historyCommand[historyIndex++], inputCommand);
                 redirectInput(argsList, i);
                 return -1;
-            }
+            } 
         }
         return argIndex; 
 }
@@ -122,7 +121,6 @@ void execCommandWithArgumetsList(char** argumentList, int numberOfWord)
     pid_t pid = fork(); 
     if(pid == 0)
     {
-            
         if(strcmp(argumentList[0],"!!")==0){
             if (historyIndex >= 1)
             {
@@ -136,7 +134,7 @@ void execCommandWithArgumetsList(char** argumentList, int numberOfWord)
         else{
             execvp(argumentList[0], argumentList); 
         }
-            
+        _exit(EXIT_SUCCESS);
     }
     else if(pid == -1)
     {
@@ -154,7 +152,7 @@ void execCommandWithArgumetsList(char** argumentList, int numberOfWord)
         {
                 
         }
-                    
+        _exit(EXIT_SUCCESS);     
     }
 }
 
@@ -165,7 +163,7 @@ void execCommand(char* command)
     int numberOfArg = parseToArgumentsList(args,command); 
     if(numberOfArg!=-1){
     execCommandWithArgumetsList(args, numberOfArg);
-
+    //pipeline(args, numberOfArg);
     if(strcmp(command, "!!") != 0)
     {
         historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
@@ -240,4 +238,62 @@ int strlenOverride(char *str){
         len++;
     }
     return len;
+}
+
+int pipeline(char** argList, int numberOfArg){
+    for (int i = 0; i < numberOfArg; i++ )
+        if (strcmp(argList[i], "|") == 0){
+            int parent_n_of_arg = i;
+            argList[i] = NULL;
+            int fd[2];
+            char str[100];
+            pid_t p;
+            int saved_stdout;
+        
+            if (pipe(fd)==-1) 
+            { 
+                printf("Pipe Failed" ); 
+                return 1; 
+            } 
+            int parent_done = 0;
+            p = fork(); 
+            if (p < 0){
+                printf("\nUnable to create process\n"); 
+                return 1;
+            } else if (p > 0) {
+                //parent
+                close(fd[0]);
+                //saved_stdout = dup(1);
+                //dup2(fd[1], 1);
+                //execvp(argList[0], argList);  
+                execCommandWithArgumetsList(argList, parent_n_of_arg); 
+                parent_done = 1;
+                printf("parent");
+                fflush(stdout);
+            } else {
+                //child
+                printf("child1");
+                fflush(stdout);
+                while (parent_done != 1)
+                {
+                }
+                printf("adasdas");
+                fflush(stdout);
+                /* char output[100];
+                read(fd[0], output, 100);        
+                char* command = "\0";
+                for (int j = i + 1; j < numberOfArg; j++)
+                {
+                    command = strcatOverride(command,argList[j]);
+                    command = strcatOverride(command," ");
+                }
+                command = strcatOverride(command, output);
+                char** child_command;
+                int child_n_of_arg = parseToArgumentsList(child_command, command);
+                pipeline(child_command, child_n_of_arg); */
+            }
+            //dup2(saved_stdout, 1);
+            //close(saved_stdout);
+            return 0;
+        }
 }

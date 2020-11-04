@@ -20,7 +20,10 @@ void redirectInput(char **argsList, int pos);
 void execHistoryCmd();
 int checkHistoryCmdExec(char *command);
 void pipeLine(char **argsList, int pos);
+void execCommandAtPos(char *command);
+char *appendHistoryCommand(char *history);
 char *strcatOverride(char *a, char *b);
+char *getParameters(char *str, int pos,int len);
 int strlenOverride(char *str);
 int main()
 { 
@@ -48,8 +51,7 @@ int main()
         //printf("\nTest here\n"); 
 
     }
-   
-
+    exit(0);
 } 
 
 
@@ -125,7 +127,7 @@ void execCommandWithArgumetsList(char** argumentList, int numberOfWord)
         else{
             execvp(argumentList[0], argumentList); 
         }
-            
+         _exit(EXIT_SUCCESS);
     }
     else if(pid == -1)
     {
@@ -141,9 +143,9 @@ void execCommandWithArgumetsList(char** argumentList, int numberOfWord)
         }
         else
         {
-                
+           _exit(EXIT_SUCCESS); 
         }
-                    
+              
     }
 }
 
@@ -154,40 +156,45 @@ void execCommand(char* command)
     char* argsList[MAXLEN/2 +1]; 
     int numberOfArg = parseToArgumentsList(argsList,command); 
     
-        for (int i = 0;i<numberOfArg;i++){
-            if(strcmp(argsList[i],">")==0){
-                historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
-                strcpy(historyCommand[historyIndex++], command);
-                redirectOutput(argsList,i);
-                return;
-            }
-            else if(strcmp(argsList[i],"<")==0){
-                historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
-                strcpy(historyCommand[historyIndex++], command);
-                redirectInput(argsList, i);
-                return;
-            }
-            else if(strcmp(argsList[i],"|")==0){
-                historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
-                strcpy(historyCommand[historyIndex++], command);
-                pipeLine(argsList, i);
-                return;
-            }
-          
-        }
-        if(strcmp(command,"history") == 0){
-            execHistoryCmd();
+    for (int i = 0;i<numberOfArg;i++){
+        if(strcmp(argsList[i],">")==0){
+            historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
+            strcpy(historyCommand[historyIndex++], command);
+            redirectOutput(argsList,i);
             return;
         }
-        else if(checkHistoryCmdExec(command)){
-            // execHistoryCmdAtPos(command);
+        else if(strcmp(argsList[i],"<")==0){
+            historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
+            strcpy(historyCommand[historyIndex++], command);
+            redirectInput(argsList, i);
+            return;
         }
+        else if(strcmp(argsList[i],"|")==0){
+            historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
+            strcpy(historyCommand[historyIndex++], command);
+            pipeLine(argsList, i);
+            return;
+        }
+          
+    }
+    if(strcmp(command,"history") == 0){
+        if(historyIndex>0&&strcmp(historyCommand[historyIndex-1],"history")){
+            historyCommand[historyIndex] = (char *)malloc(sizeof(char) * MAXLEN);
+            strcpy(historyCommand[historyIndex++], command);
+        }
+        execHistoryCmd();
+        return;
+    }
+    else if(checkHistoryCmdExec(command)){
+        execCommandAtPos(command);
+        return;
+    }
+
     execCommandWithArgumetsList(argsList, numberOfArg);
 
     if(strcmp(command, "!!") != 0)
     {
         historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
-
         strcpy(historyCommand[historyIndex++], command); 
     }
    
@@ -263,7 +270,7 @@ void pipeLine(char **argsList,int pos){
     char *command1 = "\0";
     char *command2 = argsList[pos + 1];
     pid_t pid;
-    int process[2];
+    int fd[2];
     for (int i = 0; i < pos; i++)
     {
         command1 = strcatOverride(command1,argsList[i]);
@@ -271,7 +278,7 @@ void pipeLine(char **argsList,int pos){
            command1 = strcatOverride(command1," ");
         }
     }
-    pipe(process);
+    pipe(fd);
     
 }
 void execHistoryCmd(){
@@ -279,23 +286,69 @@ void execHistoryCmd(){
         printf("%d %s\n", i + 1, historyCommand[i]);
     }
 }
+void execCommandAtPos(char *command){
+    int isCharHead = 0;
+    int index = 0;
+    int stopPosition = 0;
+    char *parameters = "\0";
+    int len = strlenOverride(command);
+    for (int i = 1; i < len;i++){
+        int temp = (int)command[i] - 48;
+        if (temp<0||temp>9)
+        {
+            stopPosition = i;
+            break;
+        }
+    }
+    if(stopPosition==0){
+        int temp = (int)command[1];
+        temp = temp - 48;
+        index += temp;
+    }
+    else if(stopPosition!=1)
+    {
+        parameters = getParameters(command, stopPosition, len);
+  
+        for (int i = 1; i < stopPosition; i++)
+        {
+            int temp = (int)command[i];
+            temp = temp - 48;
+            index += temp;
+            if (i < stopPosition - 1)
+            {
+                index *= 10;
+            }
+            
+        }
+    }
+    if(index>historyIndex||index==0){
+        if(stopPosition==1){
+            printf("bash: %s: event not found\n",command);
+        }
+        else{
+            printf("bash: %d: event not found\n",index);
+        }
+    }
+    else{
+        char *newCommand = strcatOverride(historyCommand[index - 1], parameters);
+        printf("%s\n", newCommand);
+        execCommand(newCommand);
+    }
+}
+
+char *getParameters(char *str, int pos,int len){
+    int resultLen = len - pos;
+    char *result = (char *)malloc(resultLen* sizeof(char));
+    for (int i = 0; i < resultLen;i++){
+        result[i] = str[i + pos];
+    }
+    return result;
+}
+
 int checkHistoryCmdExec(char *command){
     if(command[0]=='!'){
         return 1;
     }
     return 0;
 }
-// FILE *pipe;
-    // size_t len = 0;
-    // ssize_t read;
-    // char * line = NULL;
-    //Read output bash cmd
-    // if (NULL == pipe) {
-    //     perror("pipe");
-    //     exit(1);
-    // }
-    // while ((read = getline(&line, &len, pipe)) != -1) {
-    //     command2 = strcat(command2, " ");
-    //     command2 = strcat(command2, line);
-    // }
-    // pclose(pipe);
+

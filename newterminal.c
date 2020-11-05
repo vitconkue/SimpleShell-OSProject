@@ -21,6 +21,7 @@ void execHistoryCmd();
 int checkHistoryCmdExec(char *command);
 void pipeLine(char **argsList, int pos);
 void execCommandAtPos(char *command);
+void execMostRecentCommand(); 
 char *appendHistoryCommand(char *history);
 char *strcatOverride(char *a, char *b);
 char *getParameters(char *str, int pos,int len);
@@ -185,6 +186,16 @@ void execCommand(char* command)
         execHistoryCmd();
         return;
     }
+    else if (strcmp(command,"!!") == 0)
+    {
+        execMostRecentCommand();
+        return; 
+    }
+    else if(strcmp(command, "exit") == 0 )
+    {
+        exit(0);
+    }
+    
     else if(checkHistoryCmdExec(command)){
         execCommandAtPos(command);
         return;
@@ -285,6 +296,10 @@ void execHistoryCmd(){
     for (int i = 0; i < historyIndex;i++){
         printf("%d %s\n", i + 1, historyCommand[i]);
     }
+}
+void execMostRecentCommand()
+{
+    execCommand(historyCommand[historyIndex-1]); 
 }
 void execCommandAtPos(char *command){
     int isCharHead = 0;

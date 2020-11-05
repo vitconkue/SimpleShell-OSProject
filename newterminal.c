@@ -17,7 +17,13 @@ void execCommandWithArgumetsList(char** argumentList, int numberOfWord);
 void execCommand(char* commmand);
 void redirectOutput(char **argsList,int pos);
 void redirectInput(char **argsList, int pos);
+void execHistoryCmd();
+int checkHistoryCmdExec(char *command);
+void execCommandAtPos(char *command);
+void execMostRecentCommand(); 
+char *appendHistoryCommand(char *history);
 char *strcatOverride(char *a, char *b);
+char *getParameters(char *str, int pos,int len);
 int strlenOverride(char *str);
 int main()
 { 
@@ -45,8 +51,7 @@ int main()
         //printf("\nTest here\n"); 
 
     }
-   
-
+    exit(0);
 } 
 
 
@@ -136,7 +141,7 @@ void execCommandWithArgumetsList(char** argumentList, int numberOfWord)
         else{
             execvp(argumentList[0], argumentList); 
         }
-            
+         _exit(EXIT_SUCCESS);
     }
     else if(pid == -1)
     {
@@ -152,30 +157,69 @@ void execCommandWithArgumetsList(char** argumentList, int numberOfWord)
         }
         else
         {
-                
+           _exit(EXIT_SUCCESS); 
         }
-                    
+              
     }
 }
 
 
 void execCommand(char* command)
 {
-    char* args[MAXLEN/2 +1]; 
-    int numberOfArg = parseToArgumentsList(args,command); 
-    if(numberOfArg!=-1){
-    execCommandWithArgumetsList(args, numberOfArg);
+
+    char* argsList[MAXLEN/2 +1]; 
+    int numberOfArg = parseToArgumentsList(argsList,command); 
+    
+    for (int i = 0;i<numberOfArg;i++){
+        if(strcmp(argsList[i],">")==0){
+            historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
+            strcpy(historyCommand[historyIndex++], command);
+            redirectOutput(argsList,i);
+            return;
+        }
+        else if(strcmp(argsList[i],"<")==0){
+            historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
+            strcpy(historyCommand[historyIndex++], command);
+            redirectInput(argsList, i);
+            return;
+        }
+        
+          
+    }
+    if(strcmp(command,"history") == 0){
+        if(historyIndex>0&&strcmp(historyCommand[historyIndex-1],"history")){
+            historyCommand[historyIndex] = (char *)malloc(sizeof(char) * MAXLEN);
+            strcpy(historyCommand[historyIndex++], command);
+        }
+        execHistoryCmd();
+        return;
+    }
+    else if (strcmp(command,"!!") == 0)
+    {
+        execMostRecentCommand();
+        return; 
+    }
+    else if(strcmp(command, "exit") == 0 )
+    {
+        exit(0);
+    }
+    
+    else if(checkHistoryCmdExec(command)){
+        execCommandAtPos(command);
+        return;
+    }
+
+    execCommandWithArgumetsList(argsList, numberOfArg);
 
     if(strcmp(command, "!!") != 0)
     {
         historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
-
         strcpy(historyCommand[historyIndex++], command); 
     }
    
 
-    }
-    resetArgumentsList(args, numberOfArg); 
+    
+    resetArgumentsList(argsList, numberOfArg); 
 }
 void redirectOutput(char** argsList,int pos){
     FILE *fout;
@@ -241,3 +285,79 @@ int strlenOverride(char *str){
     }
     return len;
 }
+
+void execHistoryCmd(){
+    for (int i = 0; i < historyIndex;i++){
+        printf("%d %s\n", i + 1, historyCommand[i]);
+    }
+}
+void execMostRecentCommand()
+{
+    execCommand(historyCommand[historyIndex-1]); 
+}
+void execCommandAtPos(char *command){
+    int isCharHead = 0;
+    int index = 0;
+    int stopPosition = 0;
+    char *parameters = "\0";
+    int len = strlenOverride(command);
+    for (int i = 1; i < len;i++){
+        int temp = (int)command[i] - 48;
+        if (temp<0||temp>9)
+        {
+            stopPosition = i;
+            break;
+        }
+    }
+    if(stopPosition==0){
+        int temp = (int)command[1];
+        temp = temp - 48;
+        index += temp;
+    }
+    else if(stopPosition!=1)
+    {
+        parameters = getParameters(command, stopPosition, len);
+  
+        for (int i = 1; i < stopPosition; i++)
+        {
+            int temp = (int)command[i];
+            temp = temp - 48;
+            index += temp;
+            if (i < stopPosition - 1)
+            {
+                index *= 10;
+            }
+            
+        }
+    }
+    if(index>historyIndex||index==0){
+        if(stopPosition==1){
+            printf("bash: %s: event not found\n",command);
+        }
+        else{
+            printf("bash: %d: event not found\n",index);
+        }
+    }
+    else{
+        char *newCommand = strcatOverride(historyCommand[index - 1], parameters);
+        printf("%s\n", newCommand);
+        execCommand(newCommand);
+    }
+}
+
+char *getParameters(char *str, int pos,int len){
+    int resultLen = len - pos;
+    char *result = (char *)malloc(resultLen* sizeof(char));
+    for (int i = 0; i < resultLen;i++){
+        result[i] = str[i + pos];
+    }
+    return result;
+}
+
+int checkHistoryCmdExec(char *command){
+    if(command[0]=='!' && command[1] != '\0'){
+        return 1;
+    }
+    return 0;
+}
+

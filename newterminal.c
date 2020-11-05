@@ -19,7 +19,6 @@ void redirectOutput(char **argsList,int pos);
 void redirectInput(char **argsList, int pos);
 void execHistoryCmd();
 int checkHistoryCmdExec(char *command);
-void pipeLine(char **argsList, int pos);
 void execCommandAtPos(char *command);
 void execMostRecentCommand(); 
 char *appendHistoryCommand(char *history);
@@ -170,12 +169,7 @@ void execCommand(char* command)
             redirectInput(argsList, i);
             return;
         }
-        else if(strcmp(argsList[i],"|")==0){
-            historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
-            strcpy(historyCommand[historyIndex++], command);
-            pipeLine(argsList, i);
-            return;
-        }
+        
           
     }
     if(strcmp(command,"history") == 0){
@@ -277,21 +271,7 @@ int strlenOverride(char *str){
     }
     return len;
 }
-void pipeLine(char **argsList,int pos){
-    char *command1 = "\0";
-    char *command2 = argsList[pos + 1];
-    pid_t pid;
-    int fd[2];
-    for (int i = 0; i < pos; i++)
-    {
-        command1 = strcatOverride(command1,argsList[i]);
-        if(pos>1&&i<pos-1){
-           command1 = strcatOverride(command1," ");
-        }
-    }
-    pipe(fd);
-    
-}
+
 void execHistoryCmd(){
     for (int i = 0; i < historyIndex;i++){
         printf("%d %s\n", i + 1, historyCommand[i]);

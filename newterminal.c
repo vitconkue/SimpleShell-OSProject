@@ -341,7 +341,7 @@ char *getParameters(char *str, int pos,int len){
 }
 
 int checkHistoryCmdExec(char *command){
-    if(command[0]=='!'){
+    if(command[0]=='!' && command[1] != '\0'){
         return 1;
     }
     return 0;

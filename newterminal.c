@@ -25,6 +25,7 @@ char *appendHistoryCommand(char *history);
 char *strcatOverride(char *a, char *b);
 char *getParameters(char *str, int pos,int len);
 int strlenOverride(char *str);
+int pipeExec(char** argsList, int index);
 int main()
 { 
     
@@ -169,7 +170,16 @@ void execCommand(char* command)
 
     char* argsList[MAXLEN/2 +1]; 
     int numberOfArg = parseToArgumentsList(argsList,command); 
-    
+    int flag = 0;
+    for(int i = 0; i < numberOfArg; i++){
+        if (strcmp(argsList[i], "|") == 0){
+            pipeExec(argsList, i);
+            flag = 1; 
+            break;  
+        }
+    }
+        
+            
     for (int i = 0;i<numberOfArg;i++){
         if(strcmp(argsList[i],">")==0){
             historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
@@ -208,8 +218,8 @@ void execCommand(char* command)
         execCommandAtPos(command);
         return;
     }
-
-    execCommandWithArgumetsList(argsList, numberOfArg);
+    if (flag == 0)
+        execCommandWithArgumetsList(argsList, numberOfArg);
 
     if(strcmp(command, "!!") != 0)
     {
@@ -361,3 +371,36 @@ int checkHistoryCmdExec(char *command){
     return 0;
 }
 
+int pipeExec(char** argsList, int index){
+    argsList[index] = NULL;
+    int fd[2];
+    pid_t p = fork();
+    if (p < 0){
+        printf("\nUnable to create process\n"); 
+        return 1;
+    } else if (p == 0) {
+        dup2(fd[1], STDOUT_FILENO); //Put output to pipe
+        close(fd[0]);
+        close(fd[1]);
+        execvp(argsList[0], argsList);
+        //child
+    }
+    pid_t p2 = fork();
+    if (p2 < 0){
+        printf("\nUnable to create process\n"); 
+        return 1;
+    } else if (p2 == 0){
+        if (pipe(fd)==-1) { 
+            printf("Pipe Failed" ); 
+            return 1; 
+        } 
+        dup2(fd[0], STDIN_FILENO);
+        close(fd[0]);
+        close(fd[1]);
+        execvp(argsList[index + 1], &argsList[index + 1]);
+    }
+
+    waitpid(p, NULL, 0);
+    waitpid(p2, NULL, 0);
+    return 0;
+}

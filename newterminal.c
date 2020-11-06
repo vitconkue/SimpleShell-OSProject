@@ -7,9 +7,9 @@
 #include<fcntl.h> 
 #define MAXLEN 80
 #define _GNU_SOURCE
-static char* historyCommand[100];
-static int historyIndex = 0; 
-
+static char* historyCommand[500];
+static int historyIndex = 0;
+static int isRedirectInput = 0;
 
 void resetArgumentsList(char* inputArgs[], int numberOfArgument);
 int parseToArgumentsList(char** argsList,char* inputCommand);
@@ -155,7 +155,6 @@ void execCommand(char* command)
 
     char* argsList[MAXLEN/2 +1]; 
     int numberOfArg = parseToArgumentsList(argsList,command);
-    int isRedirectInput = 0;
     for (int i = 0; i < numberOfArg; i++)
     {
         if(strcmp(argsList[i],">")==0){
@@ -165,10 +164,11 @@ void execCommand(char* command)
             return;
         }
         else if(strcmp(argsList[i],"<")==0){
-            historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
+         
+            historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN);
             strcpy(historyCommand[historyIndex++], command);
-            isRedirectInput = 1;
             redirectInput(argsList, i);
+            isRedirectInput = 0;
             return;
         }
     }
@@ -197,14 +197,12 @@ void execCommand(char* command)
 
     execCommandWithArgumetsList(argsList, numberOfArg);
 
-    if(strcmp(command, "!!") != 0&&isRedirectInput)
+    if(strcmp(command, "!!") != 0&&isRedirectInput==0)
     {
-        historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
-        strcpy(historyCommand[historyIndex++], command); 
+        historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN);
+        strcpy(historyCommand[historyIndex++], command);
     }
-   
 
-    
     resetArgumentsList(argsList, numberOfArg); 
 }
 void redirectOutput(char** argsList,int pos){
@@ -250,6 +248,7 @@ void redirectInput(char **argsList, int pos){
         printf("bash: %s: No such file or directory\n", filename);
     }
     else{
+        isRedirectInput = 1;
         dup2(fin, STDIN_FILENO);
         execCommand(command);
     }

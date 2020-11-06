@@ -168,10 +168,9 @@ void execCommand(char* command)
 {
 
     char* argsList[MAXLEN/2 +1]; 
-    int numberOfArg = parseToArgumentsList(argsList,command);
-    int isRedirectInput = 0;
-    for (int i = 0; i < numberOfArg; i++)
-    {
+    int numberOfArg = parseToArgumentsList(argsList,command); 
+    
+    for (int i = 0;i<numberOfArg;i++){
         if(strcmp(argsList[i],">")==0){
             historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
             strcpy(historyCommand[historyIndex++], command);
@@ -181,10 +180,11 @@ void execCommand(char* command)
         else if(strcmp(argsList[i],"<")==0){
             historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
             strcpy(historyCommand[historyIndex++], command);
-            isRedirectInput = 1;
             redirectInput(argsList, i);
             return;
         }
+        
+          
     }
     if(strcmp(command,"history") == 0){
         if(historyIndex>0&&strcmp(historyCommand[historyIndex-1],"history")){
@@ -211,7 +211,7 @@ void execCommand(char* command)
 
     execCommandWithArgumetsList(argsList, numberOfArg);
 
-    if(strcmp(command, "!!") != 0&&isRedirectInput)
+    if(strcmp(command, "!!") != 0)
     {
         historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
         strcpy(historyCommand[historyIndex++], command); 
@@ -241,7 +241,6 @@ void redirectOutput(char** argsList,int pos){
     dup2(file_desc, 1) ;           
     execCommand(command);
     fclose(fout);
-    close(file_desc);
     //Back to output terminal
     dup2(saved_stdout, 1);
     close(saved_stdout);
@@ -253,23 +252,10 @@ void redirectInput(char **argsList, int pos){
     for (int i = 0; i < pos; i++)
     {
         command = strcatOverride(command,argsList[i]);
-        if(pos>1&&i<pos-1){
-           command = strcatOverride(command," ");
-        }
+        command = strcatOverride(command," ");
     }
-    int saved_stdout;
-    saved_stdout = dup(0);
-    int fin = open(filename, O_RDONLY);
-    if(fin < 0){
-        printf("bash: %s: No such file or directory\n", filename);
-    }
-    else{
-        dup2(fin, STDIN_FILENO);
-        execCommand(command);
-    }
-    close(fin);
-    dup2(saved_stdout, 0);
-    close(saved_stdout);
+    command = strcatOverride(command, filename);
+    execCommand(command);
 }
 
 char *strcatOverride(char *a, char *b) {
@@ -374,4 +360,3 @@ int checkHistoryCmdExec(char *command){
     }
     return 0;
 }
-

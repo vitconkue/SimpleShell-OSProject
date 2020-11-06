@@ -174,7 +174,7 @@ void execCommand(char* command)
     for(int i = 0; i < numberOfArg; i++){
         if (strcmp(argsList[i], "|") == 0){
             pipeExec(argsList, i);
-            flag = 1; 
+            flag = 1;
             break;  
         }
     }
@@ -372,6 +372,7 @@ int checkHistoryCmdExec(char *command){
 }
 
 int pipeExec(char** argsList, int index){
+    char* temp = argsList[index];
     argsList[index] = NULL;
     int fd[2];
     if (pipe(fd)==-1) { 
@@ -381,6 +382,7 @@ int pipeExec(char** argsList, int index){
     pid_t p = fork();
     if (p < 0){
         printf("\nUnable to create process\n"); 
+        argsList[index] = temp;
         return 1;
     } else if (p == 0) {
         dup2(fd[1], STDOUT_FILENO); //Put output to pipe
@@ -392,6 +394,7 @@ int pipeExec(char** argsList, int index){
     pid_t p2 = fork();
     if (p2 < 0){
         printf("\nUnable to create process\n"); 
+        argsList[index] = temp;
         return 1;
     } else if (p2 == 0){
         dup2(fd[0], STDIN_FILENO);
@@ -403,5 +406,6 @@ int pipeExec(char** argsList, int index){
     close(fd[1]);
     waitpid(p, NULL, 0);
     waitpid(p2, NULL, 0);
+    argsList[index] = temp;
     return 0;
 }

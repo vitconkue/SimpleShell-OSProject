@@ -11,7 +11,6 @@ static char *historyCommand[500] = {"\0"};
 static int historyIndex = 0;
 static int isRedirectInput = 0;
 static int isRedirectOutput = 0;
-static char *prevCommmand = "\0";
 
 void resetArgumentsList(char *inputArgs[], int numberOfArgument);
 int parseToArgumentsList(char** argsList,char* inputCommand);
@@ -20,6 +19,7 @@ void execCommand(char* commmand);
 void redirectOutput(char **argsList,int pos);
 void redirectInput(char **argsList, int pos);
 void execHistoryCmd();
+int pipeExec(char **argsList, int index);
 int checkHistoryCmdExec(char *command);
 void execCommandAtPos(char *command);
 void execMostRecentCommand(); 
@@ -160,16 +160,27 @@ void execCommand(char* command)
     int numberOfArg = parseToArgumentsList(argsList,command);
     //Get last index of history array;
     int lastIndex = historyIndex > 0 ? historyIndex - 1 : 0;
+     for(int i = 0; i < numberOfArg; i++){
+        if (strcmp(argsList[i], "|") == 0){
+            if(historyCommand[lastIndex]=="\0"||strcmp(historyCommand[lastIndex], command)){
+                historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN);       
+                strcpy(historyCommand[historyIndex++], command);
+            }
+            pipeExec(argsList, i);
+            flag = 1;
+            break;  
+        }
+    }
     for (int i = 0; i < numberOfArg; i++)
     {
         if(strcmp(argsList[i],">")==0){
             //If history is empty or previous not same at current command. 
             //Add current command to history and copy current command to previous command//
-            if(historyCommand[lastIndex]=="\0"||strcmp(historyCommand[lastIndex], prevCommmand)){
+            printf("%s\n", historyCommand[lastIndex]);
+            if (historyCommand[lastIndex] == "\0" || strcmp(historyCommand[lastIndex], command))
+            {
                 historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN);       
                 strcpy(historyCommand[historyIndex++], command);
-                prevCommmand = (char*)malloc(sizeof(char) * MAXLEN); 
-                strcpy(prevCommmand, historyCommand[lastIndex]);
             }
             //Change flag status
             flag = 1;
@@ -177,19 +188,17 @@ void execCommand(char* command)
         }
         else if(strcmp(argsList[i],"<")==0){
           //Same up there
-            if(historyCommand[lastIndex]=="\0"||strcmp(historyCommand[lastIndex], prevCommmand)){
+            if(historyCommand[lastIndex]=="\0"||strcmp(historyCommand[lastIndex], command)){
                 historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN);       
                 strcpy(historyCommand[historyIndex++], command);
-                prevCommmand = (char*)malloc(sizeof(char) * MAXLEN); 
-                strcpy(prevCommmand, historyCommand[lastIndex]);
             }
             flag = 1;
             redirectInput(argsList, i);    
         }
     }
     if(strcmp(command,"history") == 0){
-        if(historyIndex>0&&strcmp(historyCommand[historyIndex-1],"history")){
-            historyCommand[historyIndex] = (char *)malloc(sizeof(char) * MAXLEN);
+        if(historyCommand[lastIndex]=="\0"||strcmp(historyCommand[lastIndex], command)){
+            historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN);       
             strcpy(historyCommand[historyIndex++], command);
         }
         flag = 1;
@@ -212,10 +221,8 @@ void execCommand(char* command)
     if(historyCommand[lastIndex]=="\0"){
       historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN);
       strcpy(historyCommand[historyIndex++], command);
-      prevCommmand = (char*)malloc(sizeof(char) * MAXLEN); 
-      strcpy(prevCommmand, historyCommand[lastIndex]);
     }
-    else if(strcmp(command, "!!") != 0&&isRedirectInput==0&&isRedirectOutput==0&&strcmp(command, prevCommmand))
+    else if(strcmp(command, "!!") != 0&&isRedirectInput==0&&isRedirectOutput==0&&strcmp(historyCommand[lastIndex], command))
     {
         historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN);
         strcpy(historyCommand[historyIndex++], command);
@@ -326,8 +333,6 @@ void execMostRecentCommand()
     //If history not empty exec last command in history command
     if (lastIndex >= 0)
     {
-        prevCommmand = (char *)malloc(sizeof(char) * MAXLEN);
-        strcpy(prevCommmand, historyCommand[lastIndex]);
         printf("%s\n", historyCommand[lastIndex]);
         execCommand(historyCommand[lastIndex]);
     }
@@ -397,3 +402,42 @@ int checkHistoryCmdExec(char *command){
     return 0;
 }
 
+int pipeExec(char** argsList, int index){
+    char* temp = argsList[index];
+    argsList[index] = NULL;
+    int fd[2];
+    if (pipe(fd)==-1) { 
+        printf("Pipe Failed" ); 
+        return 1; 
+    } 
+    pid_t p = fork();
+    if (p < 0){
+        printf("\nUnable to create process\n"); 
+        argsList[index] = temp;
+        return 1;
+    } else if (p == 0) {
+        dup2(fd[1], STDOUT_FILENO); //Put output to pipe
+        close(fd[0]);
+        close(fd[1]);
+        execvp(argsList[0], argsList);
+        //child
+    }
+    pid_t p2 = fork();
+    if (p2 < 0){
+        printf("\nUnable to create process\n"); 
+        argsList[index] = temp;
+        return 1;
+    } else if (p2 == 0){
+        dup2(fd[0], STDIN_FILENO);
+        close(fd[0]);
+        close(fd[1]);
+        execvp(argsList[index + 1], &argsList[index + 1]);
+        exit(EXIT_SUCCESS);
+    }
+    close(fd[0]);
+    close(fd[1]);
+    waitpid(p, NULL, 0);
+    waitpid(p2, NULL, 0);
+    argsList[index] = temp;
+    return 0;
+}

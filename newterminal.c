@@ -7,17 +7,19 @@
 #include<fcntl.h> 
 #define MAXLEN 80
 #define _GNU_SOURCE
-static char* historyCommand[100];
-static int historyIndex = 0; 
+static char *historyCommand[500] = {"\0"};
+static int historyIndex = 0;
+static int isRedirectInput = 0;
+static int isRedirectOutput = 0;
 
-
-void resetArgumentsList(char* inputArgs[], int numberOfArgument);
+void resetArgumentsList(char *inputArgs[], int numberOfArgument);
 int parseToArgumentsList(char** argsList,char* inputCommand);
 void execCommandWithArgumetsList(char** argumentList, int numberOfWord);
 void execCommand(char* commmand);
 void redirectOutput(char **argsList,int pos);
 void redirectInput(char **argsList, int pos);
 void execHistoryCmd();
+int pipeExec(char **argsList, int index);
 int checkHistoryCmdExec(char *command);
 void execCommandAtPos(char *command);
 void execMostRecentCommand(); 
@@ -25,7 +27,6 @@ char *appendHistoryCommand(char *history);
 char *strcatOverride(char *a, char *b);
 char *getParameters(char *str, int pos,int len);
 int strlenOverride(char *str);
-int pipeExec(char** argsList, int index);
 int main()
 { 
     
@@ -37,7 +38,8 @@ int main()
 
     while (shouldRun)
     {
-        printf("osh > "); 
+        
+        printf("osh> ");
         fflush(stdout); 
 
         char enteredCommand[MAXLEN+1]; 
@@ -94,21 +96,7 @@ int parseToArgumentsList(char** argsList,char* inputCommand)
             *(argsList[argIndex] + i)  = '\0';
             argIndex++; 
         }
-       
-        for (int i = 0;i<argIndex;i++){
-            if(strcmp(argsList[i],">")==0){
-                historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
-                strcpy(historyCommand[historyIndex++], inputCommand);
-                redirectOutput(argsList,i);
-                return -1;
-            }
-            else if(strcmp(argsList[i],"<")==0){
-                historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
-                strcpy(historyCommand[historyIndex++], inputCommand);
-                redirectInput(argsList, i);
-                return -1;
-            }
-        }
+        
         return argIndex; 
 }
 
@@ -128,7 +116,7 @@ void execCommandWithArgumetsList(char** argumentList, int numberOfWord)
     pid_t pid = fork(); 
     if(pid == 0)
     {
-        
+            
         if(strcmp(argumentList[0],"!!")==0){
             if (historyIndex >= 1)
             {
@@ -136,13 +124,11 @@ void execCommandWithArgumetsList(char** argumentList, int numberOfWord)
                 execCommand(historyCommand[historyIndex-1]); 
             }
             else{
-                printf("No command in history\n");
+                printf("empty\n");
             }
         }
         else{
-            
             execvp(argumentList[0], argumentList); 
-            
         }
          _exit(EXIT_SUCCESS);
     }
@@ -157,13 +143,11 @@ void execCommandWithArgumetsList(char** argumentList, int numberOfWord)
         if(willWait)
         {
             wait( &childStatus);
-            
         }
         else
         {
+            printf("Child process still running\n");
            //_exit(EXIT_SUCCESS); 
-           fflush(stdout); 
-           printf("Child process running in background.\n"); 
         }
               
     }
@@ -172,72 +156,89 @@ void execCommandWithArgumetsList(char** argumentList, int numberOfWord)
 
 void execCommand(char* command)
 {
-
-    char* argsList[MAXLEN/2 +1]; 
-    int numberOfArg = parseToArgumentsList(argsList,command); 
     int flag = 0;
-    for(int i = 0; i < numberOfArg; i++){
+    char *argsList[MAXLEN / 2 + 1];
+    int numberOfArg = parseToArgumentsList(argsList,command);
+    //Get last index of history array;
+    int lastIndex = historyIndex > 0 ? historyIndex - 1 : 0;
+     for(int i = 0; i < numberOfArg; i++){
         if (strcmp(argsList[i], "|") == 0){
+            if(historyCommand[lastIndex]=="\0"||strcmp(historyCommand[lastIndex], command)){
+                historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN);       
+                strcpy(historyCommand[historyIndex++], command);
+            }
             pipeExec(argsList, i);
             flag = 1;
             break;  
         }
     }
-        
-            
-    for (int i = 0;i<numberOfArg;i++){
+    for (int i = 0; i < numberOfArg; i++)
+    {
         if(strcmp(argsList[i],">")==0){
-            historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
-            strcpy(historyCommand[historyIndex++], command);
+            //If history is empty or previous not same at current command. 
+            //Add current command to history and copy current command to previous command//
+            
+            if (historyCommand[lastIndex] == "\0" || strcmp(historyCommand[lastIndex], command))
+            {
+                historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN);       
+                strcpy(historyCommand[historyIndex++], command);
+            }
+            //Change flag status
+            flag = 1;
             redirectOutput(argsList,i);
-            return;
         }
         else if(strcmp(argsList[i],"<")==0){
-            historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
-            strcpy(historyCommand[historyIndex++], command);
-            redirectInput(argsList, i);
-            return;
+          //Same up there
+            if(historyCommand[lastIndex]=="\0"||strcmp(historyCommand[lastIndex], command)){
+                historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN);       
+                strcpy(historyCommand[historyIndex++], command);
+            }
+            flag = 1;
+            redirectInput(argsList, i);    
         }
-        
-          
     }
     if(strcmp(command,"history") == 0){
-        if(historyIndex>0&&strcmp(historyCommand[historyIndex-1],"history")){
-            historyCommand[historyIndex] = (char *)malloc(sizeof(char) * MAXLEN);
+        if(historyCommand[lastIndex]=="\0"||strcmp(historyCommand[lastIndex], command)){
+            historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN);       
             strcpy(historyCommand[historyIndex++], command);
         }
+        flag = 1;
         execHistoryCmd();
-        return;
     }
     else if (strcmp(command,"!!") == 0)
     {
+        flag = 1;
         execMostRecentCommand();
-        return; 
     }
     else if(strcmp(command, "exit") == 0 )
     {
         exit(0);
     }
-    
     else if(checkHistoryCmdExec(command)){
+        flag = 1;
         execCommandAtPos(command);
-        return;
     }
-    if (flag == 0)
-        execCommandWithArgumetsList(argsList, numberOfArg);
-
-    if(strcmp(command, "!!") != 0)
+    //Same up there
+    if(historyCommand[lastIndex]=="\0"){
+      historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN);
+      strcpy(historyCommand[historyIndex++], command);
+    }
+    else if(strcmp(command, "!!") != 0&&isRedirectInput==0&&isRedirectOutput==0&&strcmp(historyCommand[lastIndex], command))
     {
-        historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN); 
-        strcpy(historyCommand[historyIndex++], command); 
+        historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN);
+        strcpy(historyCommand[historyIndex++], command);
     }
    
-
-    
-    resetArgumentsList(argsList, numberOfArg); 
+    //If flag equals to 0 exec system command normal way
+    if(flag==0){
+        execCommandWithArgumetsList(argsList,numberOfArg);
+        resetArgumentsList(argsList, numberOfArg);
+    }
 }
 void redirectOutput(char** argsList,int pos){
     FILE *fout;
+    //Change redirect status (for not add command output to history)
+    isRedirectOutput = 1;
     char *command = "\0";
     char *filename = argsList[pos + 1];
     for (int i = 0; i < pos; i++)
@@ -247,15 +248,17 @@ void redirectOutput(char** argsList,int pos){
            command = strcatOverride(command," ");
         }
     }
+    //Open file to write (auto create if there is no file)
     fout = fopen(filename, "w");
     int file_desc = open(filename,O_WRONLY); 
     int saved_stdout;
     //Save stdout for terminal
     saved_stdout = dup(1);
     //Dup output file to write
-    dup2(file_desc, 1) ;           
+    dup2(file_desc, 1) ;
     execCommand(command);
     fclose(fout);
+    close(file_desc);
     //Back to output terminal
     dup2(saved_stdout, 1);
     close(saved_stdout);
@@ -267,10 +270,28 @@ void redirectInput(char **argsList, int pos){
     for (int i = 0; i < pos; i++)
     {
         command = strcatOverride(command,argsList[i]);
-        command = strcatOverride(command," ");
+        if(pos>1&&i<pos-1){
+           command = strcatOverride(command," ");
+        }
     }
-    command = strcatOverride(command, filename);
-    execCommand(command);
+    int saved_stdout;
+    saved_stdout = dup(0);
+    int fin = open(filename, O_RDONLY);
+    //If cant open file
+    if(fin < 0){
+        printf("bash: %s: No such file or directory\n", filename);
+    }
+    else{
+        isRedirectInput = 1;
+        //Dupplicate to get input from file
+        dup2(fin, STDIN_FILENO);
+        //Execute command with input from file
+        execCommand(command);
+    }
+    //Close file
+    close(fin);
+    dup2(saved_stdout, 0);
+    close(saved_stdout);
 }
 
 char *strcatOverride(char *a, char *b) {
@@ -306,23 +327,24 @@ void execHistoryCmd(){
         printf("%d %s\n", i + 1, historyCommand[i]);
     }
 }
+
 void execMostRecentCommand()
 {
-    fflush(stdout); 
-    if(historyIndex >= 1)
+    int lastIndex = historyIndex - 1;
+    //If history not empty exec last command in history command
+    if (lastIndex >= 0)
     {
-         printf("%s\n", historyCommand[historyIndex-1]);
-         execCommand(historyCommand[historyIndex-1]); 
+        printf("%s\n", historyCommand[lastIndex]);
+        execCommand(historyCommand[lastIndex]);
     }
     else
     {
+        fflush(stdout); 
         printf("No command in history\n"); 
     }
     
-   
 }
 void execCommandAtPos(char *command){
-    int isCharHead = 0;
     int index = 0;
     int stopPosition = 0;
     char *parameters = "\0";
@@ -417,6 +439,7 @@ int pipeExec(char** argsList, int index){
         close(fd[0]);
         close(fd[1]);
         execvp(argsList[index + 1], &argsList[index + 1]);
+        exit(EXIT_SUCCESS);
     }
     close(fd[0]);
     close(fd[1]);

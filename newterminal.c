@@ -37,7 +37,7 @@ int main()
 
     while (shouldRun)
     {
-        printf("osh> "); 
+        printf("osh > "); 
         fflush(stdout); 
 
         char enteredCommand[MAXLEN+1]; 
@@ -128,7 +128,7 @@ void execCommandWithArgumetsList(char** argumentList, int numberOfWord)
     pid_t pid = fork(); 
     if(pid == 0)
     {
-            
+        
         if(strcmp(argumentList[0],"!!")==0){
             if (historyIndex >= 1)
             {
@@ -136,11 +136,13 @@ void execCommandWithArgumetsList(char** argumentList, int numberOfWord)
                 execCommand(historyCommand[historyIndex-1]); 
             }
             else{
-                printf("empty\n");
+                printf("No command in history\n");
             }
         }
         else{
+            
             execvp(argumentList[0], argumentList); 
+            
         }
          _exit(EXIT_SUCCESS);
     }
@@ -155,10 +157,13 @@ void execCommandWithArgumetsList(char** argumentList, int numberOfWord)
         if(willWait)
         {
             wait( &childStatus);
+            
         }
         else
         {
-           _exit(EXIT_SUCCESS); 
+           //_exit(EXIT_SUCCESS); 
+           fflush(stdout); 
+           printf("Child process running in background.\n"); 
         }
               
     }
@@ -303,7 +308,18 @@ void execHistoryCmd(){
 }
 void execMostRecentCommand()
 {
-    execCommand(historyCommand[historyIndex-1]); 
+    fflush(stdout); 
+    if(historyIndex >= 1)
+    {
+         printf("%s\n", historyCommand[historyIndex-1]);
+         execCommand(historyCommand[historyIndex-1]); 
+    }
+    else
+    {
+        printf("No command in history\n"); 
+    }
+    
+   
 }
 void execCommandAtPos(char *command){
     int isCharHead = 0;

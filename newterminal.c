@@ -146,7 +146,8 @@ void execCommandWithArgumetsList(char** argumentList, int numberOfWord)
         }
         else
         {
-           _exit(EXIT_SUCCESS); 
+            printf("Child process still running\n");
+           //_exit(EXIT_SUCCESS); 
         }
               
     }
@@ -176,7 +177,7 @@ void execCommand(char* command)
         if(strcmp(argsList[i],">")==0){
             //If history is empty or previous not same at current command. 
             //Add current command to history and copy current command to previous command//
-            printf("%s\n", historyCommand[lastIndex]);
+            
             if (historyCommand[lastIndex] == "\0" || strcmp(historyCommand[lastIndex], command))
             {
                 historyCommand[historyIndex] = (char*)malloc(sizeof(char) * MAXLEN);       
@@ -336,6 +337,12 @@ void execMostRecentCommand()
         printf("%s\n", historyCommand[lastIndex]);
         execCommand(historyCommand[lastIndex]);
     }
+    else
+    {
+        fflush(stdout); 
+        printf("No command in history\n"); 
+    }
+    
 }
 void execCommandAtPos(char *command){
     int index = 0;
